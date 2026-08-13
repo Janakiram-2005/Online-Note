@@ -16,15 +16,17 @@ import { Plus, FileText, Lock, Sparkles, ShieldAlert } from 'lucide-react';
 
 export default function App() {
   // Check if current URL is a public share link (/share/xyz)
-  const currentPath = window.location.pathname;
-  if (currentPath.startsWith('/share/')) {
-    const shareToken = currentPath.replace('/share/', '').trim();
-    return <PublicShareView shareToken={shareToken} />;
+  const shareMatch = window.location.pathname.match(/^\/share\/([a-zA-Z0-9_-]+)/);
+  if (shareMatch && shareMatch[1]) {
+    return <PublicShareView shareToken={shareMatch[1]} />;
   }
 
   // Auth & Workspace Lock State
   const [isPinSetup, setIsPinSetup] = useState<boolean | null>(null);
   const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
+
+  // Inactivity tracking ref (5 min auto-lock)
+  const lastActivityRef = useRef<number>(Date.now());
 
   // Workspace State
   const [documents, setDocuments] = useState<NoteDocument[]>([]);
@@ -63,23 +65,57 @@ export default function App() {
     onConfirm: () => {},
   });
 
-  // Check PIN status on app launch
+  // Check PIN status on app launch (Require PIN unlock on every fresh page open/reload if setup)
   const checkPinStatus = useCallback(async () => {
     try {
       const res = await fetch('/api/auth/pin-status');
       const data = await res.json();
       setIsPinSetup(data.isSetup);
-      setIsUnlocked(data.isUnlocked);
+      if (data.isSetup) {
+        // Always require PIN re-authentication on new page open / reload
+        setIsUnlocked(false);
+      } else {
+        setIsUnlocked(true);
+      }
     } catch (e) {
       console.error('Failed to check PIN status:', e);
       setIsPinSetup(false);
-      setIsUnlocked(false);
+      setIsUnlocked(true);
     }
   }, []);
 
   useEffect(() => {
     checkPinStatus();
   }, [checkPinStatus]);
+
+  // 5-Minute Inactivity Auto-Lock
+  useEffect(() => {
+    if (!isUnlocked || !isPinSetup) return;
+
+    const resetActivity = () => {
+      lastActivityRef.current = Date.now();
+    };
+
+    const events = ['mousemove', 'keydown', 'click', 'touchstart', 'scroll', 'pointerdown'];
+    events.forEach((evt) => window.addEventListener(evt, resetActivity, { passive: true }));
+
+    const checkInterval = setInterval(() => {
+      const elapsed = Date.now() - lastActivityRef.current;
+      if (elapsed >= 5 * 60 * 1000) {
+        // 5 minutes of inactivity passed -> lock workspace
+        fetch('/api/auth/lock', { method: 'POST' }).catch(() => {});
+        setIsUnlocked(false);
+        setIsSettingsOpen(false);
+        setIsShareModalOpen(false);
+        setIsSearchOpen(false);
+      }
+    }, 10000);
+
+    return () => {
+      events.forEach((evt) => window.removeEventListener(evt, resetActivity));
+      clearInterval(checkInterval);
+    };
+  }, [isUnlocked, isPinSetup]);
 
   // Load Workspace Data
   const loadWorkspace = useCallback(async () => {
