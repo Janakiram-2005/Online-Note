@@ -32,8 +32,6 @@ interface SidebarProps {
   onOpenSettings: () => void;
   onLock: () => void;
   favorites: string[];
-  driveConnected: boolean;
-  driveUserEmail?: string | null;
   isOpenMobile: boolean;
   onCloseMobile: () => void;
 }
@@ -49,8 +47,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenSettings,
   onLock,
   favorites,
-  driveConnected,
-  driveUserEmail,
   isOpenMobile,
   onCloseMobile,
 }) => {
@@ -90,17 +86,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div>
                 <div className="font-semibold text-base text-[#33302E] dark:text-[#F9F8F6] tracking-tight">MyNotes</div>
                 <div className="text-[11px] text-[#8C8881] dark:text-[#A39F98] flex items-center gap-1">
-                  {driveConnected ? (
-                    <>
-                      <Cloud className="w-3 h-3 text-[#5A5A40]" />
-                      <span className="truncate max-w-[110px]">{driveUserEmail || 'Google Drive'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <CloudOff className="w-3 h-3 text-[#8C8881]" />
-                      <span>Local Workspace</span>
-                    </>
-                  )}
+                  <span className="w-2 h-2 rounded-full bg-[#A3D9A5]" />
+                  <span>Server Storage Active</span>
                 </div>
               </div>
             </div>

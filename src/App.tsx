@@ -12,8 +12,7 @@ import { ShareModal } from './components/ShareModal';
 import { PublicShareView } from './components/PublicShareView';
 import { exportDocumentToPdf } from './utils/pdf';
 import { exportDocumentToMarkdown, parseMarkdownToBlocks } from './utils/markdown';
-import { initDriveWorkspace, saveDocToDrive, loadDocsFromDrive, trashDocInDrive, restoreDocInDrive } from './lib/drive';
-import { Plus, FileText, Lock, Sparkles, Cloud, ShieldAlert } from 'lucide-react';
+import { Plus, FileText, Lock, Sparkles, ShieldAlert } from 'lucide-react';
 
 export default function App() {
   // Check if current URL is a public share link (/share/xyz)
@@ -26,10 +25,6 @@ export default function App() {
   // Auth & Workspace Lock State
   const [isPinSetup, setIsPinSetup] = useState<boolean | null>(null);
   const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
-  const [driveConnected, setDriveConnected] = useState<boolean>(false);
-  const [driveUserEmail, setDriveUserEmail] = useState<string | null>(null);
-  const [driveAccessToken, setDriveAccessToken] = useState<string | null>(null);
-  const [driveConfig, setDriveConfig] = useState<{ rootFolderId: string; docsFolderId: string } | null>(null);
 
   // Workspace State
   const [documents, setDocuments] = useState<NoteDocument[]>([]);
@@ -75,8 +70,6 @@ export default function App() {
       const data = await res.json();
       setIsPinSetup(data.isSetup);
       setIsUnlocked(data.isUnlocked);
-      setDriveConnected(data.driveConnected);
-      setDriveUserEmail(data.driveUserEmail);
     } catch (e) {
       console.error('Failed to check PIN status:', e);
       setIsPinSetup(false);
@@ -301,25 +294,13 @@ export default function App() {
           body: JSON.stringify(docToSave),
         });
 
-        // 2. If Google Drive is authorized, sync to Drive
-        if (driveAccessToken && driveConfig) {
-          try {
-            const fileId = await saveDocToDrive(driveAccessToken, docToSave, driveConfig.docsFolderId);
-            docToSave.driveFileId = fileId;
-          } catch (driveErr) {
-            console.warn('Drive sync warning:', driveErr);
-            setSaveStatus({ state: 'offline', message: 'Saved locally (Drive sync pending)' });
-            return;
-          }
-        }
-
         setSaveStatus({ state: 'saved' });
       } catch (err) {
         console.error('Failed to save document:', err);
         setSaveStatus({ state: 'error', message: 'Save error - retrying...' });
       }
     },
-    [driveAccessToken, driveConfig]
+    []
   );
 
   const handleDocumentChange = (updatedDoc: NoteDocument) => {
@@ -371,12 +352,6 @@ export default function App() {
         }
 
         fetch(`/api/documents/${docId}`, { method: 'DELETE' });
-
-        if (driveAccessToken && targetDoc.driveFileId) {
-          trashDocInDrive(driveAccessToken, targetDoc.driveFileId).catch((err) =>
-            console.warn('Drive trash error:', err)
-          );
-        }
 
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
       },
@@ -563,8 +538,6 @@ export default function App() {
         onOpenSettings={() => setIsSettingsOpen(true)}
         onLock={handleLockWorkspace}
         favorites={favorites}
-        driveConnected={driveConnected}
-        driveUserEmail={driveUserEmail}
         isOpenMobile={isMobileMenuOpen}
         onCloseMobile={() => setIsMobileMenuOpen(false)}
       />
@@ -575,7 +548,6 @@ export default function App() {
           document={activeDoc}
           folder={activeFolder}
           saveStatus={saveStatus}
-          driveConnected={driveConnected}
           theme={metadata.theme}
           onToggleTheme={handleToggleTheme}
           isFavorite={activeDoc ? favorites.includes(activeDoc.id) || Boolean(activeDoc.isFavorite) : false}
@@ -648,16 +620,7 @@ export default function App() {
             body: JSON.stringify(newSettings),
           });
         }}
-        driveConnected={driveConnected}
-        driveUserEmail={driveUserEmail}
-        onConnectDrive={() => {
-          setIsSettingsOpen(false);
-          alert('Google Drive OAuth authorization flow can be initialized using your Google account credentials.');
-        }}
         onExportNotes={handleExportNotes}
-        onSyncDrive={() => {
-          loadWorkspace();
-        }}
       />
 
       <FolderModal

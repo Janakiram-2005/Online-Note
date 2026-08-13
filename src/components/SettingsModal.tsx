@@ -21,11 +21,7 @@ interface SettingsModalProps {
   onClose: () => void;
   metadata: WorkspaceMetadata;
   onUpdateSettings: (newSettings: Partial<WorkspaceMetadata>) => void;
-  driveConnected: boolean;
-  driveUserEmail?: string | null;
-  onConnectDrive: () => void;
   onExportNotes: () => void;
-  onSyncDrive: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -33,13 +29,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
   metadata,
   onUpdateSettings,
-  driveConnected,
-  driveUserEmail,
-  onConnectDrive,
   onExportNotes,
-  onSyncDrive,
 }) => {
-  const [activeTab, setActiveTab] = useState<'security' | 'drive' | 'general'>('security');
+  const [activeTab, setActiveTab] = useState<'security' | 'general'>('security');
 
   // Change PIN state
   const [currentPin, setCurrentPin] = useState('');
@@ -123,16 +115,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             }`}
           >
             Security & PIN
-          </button>
-          <button
-            onClick={() => setActiveTab('drive')}
-            className={`px-3 py-2 border-b-2 transition cursor-pointer ${
-              activeTab === 'drive'
-                ? 'border-[#5A5A40] text-[#5A5A40] dark:text-[#F9F8F6]'
-                : 'border-transparent text-[#8C8881] hover:text-[#2A2826] dark:hover:text-[#F9F8F6]'
-            }`}
-          >
-            Google Drive Storage
           </button>
           <button
             onClick={() => setActiveTab('general')}
@@ -232,107 +214,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
           )}
 
-          {/* TAB 2: Google Drive Storage */}
-          {activeTab === 'drive' && (
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-sm font-bold text-[#2A2826] dark:text-[#F9F8F6] flex items-center gap-2">
-                  <Cloud className="w-4 h-4 text-[#5A5A40]" />
-                  <span>Google Drive Document Persistence</span>
-                </h3>
-                <p className="text-xs text-[#8C8881] mt-1">
-                  Your documents are stored directly in your personal Google Drive in the <code className="px-1 py-0.5 bg-[#F3F1EE] dark:bg-[#2C2A28] rounded">MyNotes/Documents/</code> folder.
-                </p>
-              </div>
-
-              {/* Connection Status Box */}
-              <div className="p-4 rounded-2xl border border-[#E8E4DF] dark:border-[#2C2A28] bg-[#F9F8F6] dark:bg-[#1A1918]/60 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className={`w-3 h-3 rounded-full ${
-                        driveConnected ? 'bg-[#A3D9A5]' : 'bg-[#C4C0B9]'
-                      }`}
-                    />
-                    <span className="text-xs font-bold text-[#2A2826] dark:text-[#F9F8F6]">
-                      {driveConnected ? 'Connected to Google Drive' : 'Local Workspace Mode'}
-                    </span>
-                  </div>
-                  {driveUserEmail && (
-                    <span className="text-xs text-[#8C8881]">{driveUserEmail}</span>
-                  )}
-                </div>
-
-                <div className="flex flex-wrap gap-2 pt-2">
-                  <button
-                    onClick={onConnectDrive}
-                    className="px-4 py-2 text-xs font-semibold text-white bg-[#5A5A40] hover:bg-[#484833] rounded-full transition flex items-center gap-2 cursor-pointer"
-                  >
-                    <Cloud className="w-3.5 h-3.5" />
-                    <span>{driveConnected ? 'Re-authorize Google Drive' : 'Connect Google Drive'}</span>
-                  </button>
-
-                  {driveConnected && (
-                    <button
-                      onClick={onSyncDrive}
-                      className="px-4 py-2 text-xs font-medium text-[#33302E] dark:text-[#F9F8F6] bg-white dark:bg-[#2C2A28] border border-[#E8E4DF] dark:border-[#2C2A28] hover:bg-[#F3F1EE] rounded-full transition flex items-center gap-2 cursor-pointer"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                      <span>Sync Drive Notes</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Instant Token Authorization Option */}
-              <div className="p-4 rounded-2xl border border-[#E8E4DF] dark:border-[#2C2A28] bg-white dark:bg-[#1A1918] space-y-3">
-                <div className="text-xs font-bold text-[#2A2826] dark:text-[#F9F8F6] flex items-center gap-2">
-                  <Key className="w-4 h-4 text-[#5A5A40]" />
-                  <span>Google OAuth Access Token</span>
-                </div>
-                <p className="text-[11px] text-[#8C8881]">
-                  If popups are restricted in your iframe preview, paste a Google Access Token below to sync immediately.
-                </p>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="password"
-                    placeholder="ya29.a0A..."
-                    id="driveTokenInput"
-                    className="flex-1 px-3 py-2 text-xs font-mono bg-[#F9F8F6] dark:bg-[#2C2A28] border border-[#E8E4DF] dark:border-[#383432] rounded-xl outline-none text-[#2A2826] dark:text-[#F9F8F6]"
-                  />
-                  <button
-                    onClick={() => {
-                      const input = document.getElementById('driveTokenInput') as HTMLInputElement;
-                      if (input && input.value.trim()) {
-                        alert('Google Drive token configured! Syncing workspace...');
-                        onSyncDrive();
-                      }
-                    }}
-                    className="px-3.5 py-2 text-xs font-semibold text-white bg-[#5A5A40] hover:bg-[#484833] rounded-xl transition cursor-pointer"
-                  >
-                    Save Token
-                  </button>
-                </div>
-              </div>
-
-              {/* OAuth Guidance Details */}
-              <div className="p-4 rounded-2xl border border-[#E8E4DF] dark:border-[#2C2A28] bg-[#F9F8F6] dark:bg-[#1A1918]/20 text-xs space-y-2">
-                <div className="font-semibold text-[#2A2826] dark:text-[#F9F8F6]">
-                  Google Drive Setup Details
-                </div>
-                <div className="text-[#8C8881] space-y-1">
-                  <div>
-                    • <strong>OAuth Scope:</strong> <code className="bg-[#E8E4DF] dark:bg-[#2C2A28] px-1 rounded">https://www.googleapis.com/auth/drive.file</code> (Narrow app-specific file access)
-                  </div>
-                  <div>
-                    • <strong>Callback URL:</strong> <code className="bg-[#E8E4DF] dark:bg-[#2C2A28] px-1 rounded">{redirectUri}</code>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: General & Theme */}
+          {/* TAB 2: General & Theme */}
           {activeTab === 'general' && (
             <div className="space-y-6">
               {/* Theme Settings */}

@@ -21,7 +21,6 @@ interface HeaderProps {
   folder: NoteFolder | null;
   saveStatus: SaveStatus;
   isFavorite: boolean;
-  driveConnected?: boolean;
   theme: 'light' | 'dark' | 'system';
   onToggleTheme: () => void;
   onToggleFavorite: () => void;
@@ -40,7 +39,6 @@ export const Header: React.FC<HeaderProps> = ({
   folder,
   saveStatus,
   isFavorite,
-  driveConnected = false,
   theme,
   onToggleTheme,
   onToggleFavorite,
@@ -112,7 +110,7 @@ export const Header: React.FC<HeaderProps> = ({
           {saveStatus.state === 'saved' && (
             <>
               <div className="w-2 h-2 rounded-full bg-[#A3D9A5]" />
-              <span>{driveConnected ? 'Saved to Drive' : 'Saved'}</span>
+              <span>Saved to server</span>
             </>
           )}
           {saveStatus.state === 'offline' && (
