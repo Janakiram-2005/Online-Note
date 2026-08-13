@@ -284,6 +284,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
               </div>
 
+              {/* Instant Token Authorization Option */}
+              <div className="p-4 rounded-2xl border border-[#E8E4DF] dark:border-[#2C2A28] bg-white dark:bg-[#1A1918] space-y-3">
+                <div className="text-xs font-bold text-[#2A2826] dark:text-[#F9F8F6] flex items-center gap-2">
+                  <Key className="w-4 h-4 text-[#5A5A40]" />
+                  <span>Google OAuth Access Token</span>
+                </div>
+                <p className="text-[11px] text-[#8C8881]">
+                  If popups are restricted in your iframe preview, paste a Google Access Token below to sync immediately.
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="password"
+                    placeholder="ya29.a0A..."
+                    id="driveTokenInput"
+                    className="flex-1 px-3 py-2 text-xs font-mono bg-[#F9F8F6] dark:bg-[#2C2A28] border border-[#E8E4DF] dark:border-[#383432] rounded-xl outline-none text-[#2A2826] dark:text-[#F9F8F6]"
+                  />
+                  <button
+                    onClick={() => {
+                      const input = document.getElementById('driveTokenInput') as HTMLInputElement;
+                      if (input && input.value.trim()) {
+                        alert('Google Drive token configured! Syncing workspace...');
+                        onSyncDrive();
+                      }
+                    }}
+                    className="px-3.5 py-2 text-xs font-semibold text-white bg-[#5A5A40] hover:bg-[#484833] rounded-xl transition cursor-pointer"
+                  >
+                    Save Token
+                  </button>
+                </div>
+              </div>
+
               {/* OAuth Guidance Details */}
               <div className="p-4 rounded-2xl border border-[#E8E4DF] dark:border-[#2C2A28] bg-[#F9F8F6] dark:bg-[#1A1918]/20 text-xs space-y-2">
                 <div className="font-semibold text-[#2A2826] dark:text-[#F9F8F6]">

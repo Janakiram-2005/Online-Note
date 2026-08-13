@@ -19,12 +19,16 @@ import {
   Plus,
   Bold,
   Italic,
-  Underline,
   Strikethrough,
   Code2,
+  Image as ImageIcon,
+  Table as TableIcon,
+  MessageSquareQuote,
+  Upload,
   Link,
-  Sparkles,
   Check,
+  PlusCircle,
+  Trash,
 } from 'lucide-react';
 
 interface EditorProps {
@@ -39,6 +43,7 @@ interface EditorProps {
 }
 
 const EMOJI_PRESETS = ['📝', '💡', '🚀', '⭐', '📚', '🎯', '🔥', '💻', '🎨', '⚙️', '📌', '🧠', '💼', '📊', '🌐', '🔮'];
+const CALLOUT_EMOJIS = ['💡', '⚠️', 'ℹ️', '🔥', '📌', '🚀', '⭐', '✅', '❤️', '🎯'];
 
 const BLOCK_MENU_ITEMS: { type: BlockType; label: string; icon: React.ReactNode; desc: string }[] = [
   { type: 'paragraph', label: 'Text', icon: <Type className="w-4 h-4" />, desc: 'Just start writing with plain text.' },
@@ -49,6 +54,9 @@ const BLOCK_MENU_ITEMS: { type: BlockType; label: string; icon: React.ReactNode;
   { type: 'bullet', label: 'Bulleted list', icon: <List className="w-4 h-4" />, desc: 'Create a simple bulleted list.' },
   { type: 'numbered', label: 'Numbered list', icon: <ListOrdered className="w-4 h-4" />, desc: 'Create a list with numbers.' },
   { type: 'quote', label: 'Quote', icon: <Quote className="w-4 h-4" />, desc: 'Capture a quote or highlight.' },
+  { type: 'callout', label: 'Callout', icon: <MessageSquareQuote className="w-4 h-4" />, desc: 'Highlighted box with icon.' },
+  { type: 'image', label: 'Image', icon: <ImageIcon className="w-4 h-4" />, desc: 'Upload or embed image.' },
+  { type: 'table', label: 'Table', icon: <TableIcon className="w-4 h-4" />, desc: 'Add a grid table.' },
   { type: 'code', label: 'Code', icon: <Code className="w-4 h-4" />, desc: 'Capture code snippet with syntax styling.' },
   { type: 'divider', label: 'Divider', icon: <Minus className="w-4 h-4" />, desc: 'Visually divide sections with a line.' },
 ];
@@ -492,6 +500,237 @@ export const Editor: React.FC<EditorProps> = ({
                 {block.type === 'divider' ? (
                   <div className="w-full py-4 my-1">
                     <hr className="border-t border-[#F3F1EE] dark:border-[#2C2A28]" />
+                  </div>
+                ) : block.type === 'callout' ? (
+                  /* Callout Block */
+                  <div className="w-full p-4 rounded-2xl border border-[#E8E4DF] dark:border-[#2C2A28] bg-[#F9F8F6] dark:bg-[#1C1A19] flex items-start gap-3 my-2">
+                    <button
+                      onClick={() => {
+                        const currentIcon = block.calloutIcon || '💡';
+                        const currentIdx = CALLOUT_EMOJIS.indexOf(currentIcon);
+                        const nextIcon = CALLOUT_EMOJIS[(currentIdx + 1) % CALLOUT_EMOJIS.length];
+                        updateBlock(block.id, { calloutIcon: nextIcon });
+                      }}
+                      title="Click to cycle icon"
+                      className="text-2xl hover:scale-110 transition cursor-pointer p-1 rounded-lg hover:bg-[#F3F1EE] dark:hover:bg-[#2C2A28]"
+                    >
+                      {block.calloutIcon || '💡'}
+                    </button>
+                    <textarea
+                      ref={(el) => {
+                        blockRefs.current[block.id] = el;
+                      }}
+                      value={block.content}
+                      onChange={(e) => handleInputChange(e, block, index)}
+                      onKeyDown={(e) => handleKeyDown(e, block, index)}
+                      readOnly={readOnly}
+                      placeholder="Callout text or reminder..."
+                      className="w-full bg-transparent border-none outline-none resize-none text-base text-[#2A2826] dark:text-[#F9F8F6] leading-relaxed placeholder:text-[#C4C0B9]"
+                    />
+                  </div>
+                ) : block.type === 'image' ? (
+                  /* Image Attachment Block */
+                  <div className="w-full my-3 p-4 rounded-2xl border border-[#E8E4DF] dark:border-[#2C2A28] bg-[#F9F8F6] dark:bg-[#1C1A19]/50 space-y-3">
+                    {block.imageUrl ? (
+                      <div className="space-y-2">
+                        <div className="relative group/img overflow-hidden rounded-xl border border-[#E8E4DF] dark:border-[#2C2A28]">
+                          <img
+                            src={block.imageUrl}
+                            alt={block.caption || 'Attached image'}
+                            className="max-h-[450px] w-auto mx-auto object-contain rounded-xl"
+                          />
+                          {!readOnly && (
+                            <button
+                              onClick={() => updateBlock(block.id, { imageUrl: undefined })}
+                              className="absolute top-2 right-2 p-1.5 bg-rose-600 text-white rounded-lg opacity-0 group-hover/img:opacity-100 transition shadow-md cursor-pointer"
+                              title="Remove image"
+                            >
+                              <Trash className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          type="text"
+                          value={block.caption || ''}
+                          onChange={(e) => updateBlock(block.id, { caption: e.target.value })}
+                          placeholder="Add image caption..."
+                          readOnly={readOnly}
+                          className="w-full text-center text-xs text-[#8C8881] bg-transparent outline-none italic"
+                        />
+                      </div>
+                    ) : (
+                      /* Drag & Drop Upload Zone */
+                      <div
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const file = e.dataTransfer.files[0];
+                          if (file && file.type.startsWith('image/')) {
+                            const reader = new FileReader();
+                            reader.onload = (event) => {
+                              updateBlock(block.id, { imageUrl: event.target?.result as string });
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="p-6 border-2 border-dashed border-[#DED9D2] dark:border-[#383532] rounded-xl flex flex-col items-center justify-center text-center space-y-3 bg-white dark:bg-[#1A1918]"
+                      >
+                        <div className="p-3 rounded-full bg-[#F3F1EE] dark:bg-[#2C2A28] text-[#5A5A40]">
+                          <Upload className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-[#2A2826] dark:text-[#F9F8F6]">
+                            Drag & drop an image here, or choose file
+                          </p>
+                          <p className="text-[11px] text-[#8C8881] mt-0.5">PNG, JPG, GIF up to 10MB</p>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                          <label className="px-3 py-1.5 text-xs font-semibold text-white bg-[#5A5A40] hover:bg-[#484833] rounded-full cursor-pointer transition">
+                            <span>Browse File</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onload = (evt) => {
+                                    updateBlock(block.id, { imageUrl: evt.target?.result as string });
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                          </label>
+                          <button
+                            onClick={() => {
+                              const url = prompt('Enter Image URL:');
+                              if (url) updateBlock(block.id, { imageUrl: url });
+                            }}
+                            className="px-3 py-1.5 text-xs font-medium text-[#2A2826] dark:text-[#F9F8F6] bg-[#F3F1EE] dark:bg-[#2C2A28] hover:bg-[#E8E4DF] rounded-full transition flex items-center gap-1 cursor-pointer"
+                          >
+                            <Link className="w-3.5 h-3.5" />
+                            <span>Embed URL</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : block.type === 'table' ? (
+                  /* Grid Table Block */
+                  <div className="w-full my-3 space-y-2">
+                    {(() => {
+                      const data =
+                        block.tableData && block.tableData.length > 0
+                          ? block.tableData
+                          : [
+                              ['Header 1', 'Header 2'],
+                              ['Row 1 Cell 1', 'Row 1 Cell 2'],
+                            ];
+
+                      const updateCell = (rIdx: number, cIdx: number, val: string) => {
+                        const newData = data.map((row, r) =>
+                          r === rIdx ? row.map((cell, c) => (c === cIdx ? val : cell)) : row
+                        );
+                        updateBlock(block.id, { tableData: newData });
+                      };
+
+                      const addRow = () => {
+                        const cols = data[0]?.length || 2;
+                        const newRow = Array(cols).fill('');
+                        updateBlock(block.id, { tableData: [...data, newRow] });
+                      };
+
+                      const addCol = () => {
+                        const newData = data.map((row, idx) => [...row, idx === 0 ? `Header ${row.length + 1}` : '']);
+                        updateBlock(block.id, { tableData: newData });
+                      };
+
+                      const removeRow = (rIdx: number) => {
+                        if (data.length <= 1) return;
+                        const newData = data.filter((_, idx) => idx !== rIdx);
+                        updateBlock(block.id, { tableData: newData });
+                      };
+
+                      const removeCol = (cIdx: number) => {
+                        if (data[0]?.length <= 1) return;
+                        const newData = data.map((row) => row.filter((_, idx) => idx !== cIdx));
+                        updateBlock(block.id, { tableData: newData });
+                      };
+
+                      return (
+                        <div className="space-y-2">
+                          <div className="overflow-x-auto border border-[#E8E4DF] dark:border-[#2C2A28] rounded-2xl">
+                            <table className="w-full text-xs text-left border-collapse">
+                              <tbody>
+                                {data.map((row, rIdx) => (
+                                  <tr
+                                    key={rIdx}
+                                    className={
+                                      rIdx === 0
+                                        ? 'bg-[#F3F1EE] dark:bg-[#2C2A28] font-bold'
+                                        : 'border-t border-[#F3F1EE] dark:border-[#2C2A28]'
+                                    }
+                                  >
+                                    {row.map((cell, cIdx) => (
+                                      <td
+                                        key={cIdx}
+                                        className="p-2 border-r border-[#F3F1EE] dark:border-[#2C2A28] last:border-r-0 relative group/cell"
+                                      >
+                                        <input
+                                          type="text"
+                                          value={cell}
+                                          onChange={(e) => updateCell(rIdx, cIdx, e.target.value)}
+                                          readOnly={readOnly}
+                                          className="w-full bg-transparent outline-none text-[#2A2826] dark:text-[#F9F8F6]"
+                                        />
+                                      </td>
+                                    ))}
+                                    {!readOnly && data.length > 1 && (
+                                      <td className="w-8 text-center p-1">
+                                        <button
+                                          onClick={() => removeRow(rIdx)}
+                                          className="text-[#8C8881] hover:text-rose-500 cursor-pointer"
+                                          title="Delete row"
+                                        >
+                                          <Trash className="w-3.5 h-3.5" />
+                                        </button>
+                                      </td>
+                                    )}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {!readOnly && (
+                            <div className="flex items-center gap-2 pt-1 text-xs text-[#8C8881]">
+                              <button
+                                onClick={addRow}
+                                className="px-3 py-1 bg-[#F3F1EE] dark:bg-[#2C2A28] hover:bg-[#E8E4DF] rounded-lg font-medium text-[#2A2826] dark:text-[#F9F8F6] flex items-center gap-1 cursor-pointer"
+                              >
+                                <PlusCircle className="w-3.5 h-3.5" /> Row
+                              </button>
+                              <button
+                                onClick={addCol}
+                                className="px-3 py-1 bg-[#F3F1EE] dark:bg-[#2C2A28] hover:bg-[#E8E4DF] rounded-lg font-medium text-[#2A2826] dark:text-[#F9F8F6] flex items-center gap-1 cursor-pointer"
+                              >
+                                <PlusCircle className="w-3.5 h-3.5" /> Column
+                              </button>
+                              {data[0]?.length > 1 && (
+                                <button
+                                  onClick={() => removeCol(data[0].length - 1)}
+                                  className="px-3 py-1 bg-[#F3F1EE] dark:bg-[#2C2A28] hover:bg-rose-100 dark:hover:bg-rose-950/40 text-rose-600 rounded-lg font-medium flex items-center gap-1 cursor-pointer ml-auto"
+                                >
+                                  <Trash className="w-3.5 h-3.5" /> Last Col
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 ) : (
                   /* Standard Input Field per Block Type */

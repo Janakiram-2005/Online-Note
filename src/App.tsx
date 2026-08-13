@@ -8,10 +8,21 @@ import { SettingsModal } from './components/SettingsModal';
 import { PINModal } from './components/PINModal';
 import { ConfirmModal } from './components/ConfirmModal';
 import { FolderModal } from './components/FolderModal';
+import { ShareModal } from './components/ShareModal';
+import { PublicShareView } from './components/PublicShareView';
+import { exportDocumentToPdf } from './utils/pdf';
+import { exportDocumentToMarkdown, parseMarkdownToBlocks } from './utils/markdown';
 import { initDriveWorkspace, saveDocToDrive, loadDocsFromDrive, trashDocInDrive, restoreDocInDrive } from './lib/drive';
 import { Plus, FileText, Lock, Sparkles, Cloud, ShieldAlert } from 'lucide-react';
 
 export default function App() {
+  // Check if current URL is a public share link (/share/xyz)
+  const currentPath = window.location.pathname;
+  if (currentPath.startsWith('/share/')) {
+    const shareToken = currentPath.replace('/share/', '').trim();
+    return <PublicShareView shareToken={shareToken} />;
+  }
+
   // Auth & Workspace Lock State
   const [isPinSetup, setIsPinSetup] = useState<boolean | null>(null);
   const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
@@ -30,7 +41,7 @@ export default function App() {
     recentDocs: [],
     folders: [],
     autoSaveInterval: 1500,
-    theme: 'system',
+    theme: 'light',
     pinConfigured: false,
     driveConnected: false,
   });
@@ -43,6 +54,7 @@ export default function App() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -371,6 +383,109 @@ export default function App() {
     });
   };
 
+  // Theme Application Effect
+  useEffect(() => {
+    const root = document.documentElement;
+    if (metadata.theme === 'dark') {
+      root.classList.add('dark');
+    } else if (metadata.theme === 'light') {
+      root.classList.remove('dark');
+    } else {
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
+    }
+  }, [metadata.theme]);
+
+  const handleToggleTheme = () => {
+    const nextTheme = metadata.theme === 'dark' ? 'light' : 'dark';
+    setMetadata((prev) => ({ ...prev, theme: nextTheme }));
+    fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ theme: nextTheme }),
+    });
+  };
+
+  // Toggle Document Share
+  const handleToggleShare = async (docId: string, isShared: boolean): Promise<string | null> => {
+    try {
+      const res = await fetch(`/api/documents/${docId}/share`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isShared }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDocuments((prev) =>
+          prev.map((d) =>
+            d.id === docId
+              ? { ...d, isPublicShared: data.isPublicShared, shareToken: data.shareToken }
+              : d
+          )
+        );
+        return data.shareToken;
+      }
+      return null;
+    } catch (e) {
+      console.error('Share toggle error:', e);
+      return null;
+    }
+  };
+
+  // Import Document (.md or .json)
+  const handleImportDocument = async (file: File) => {
+    try {
+      const text = await file.text();
+      let importedDoc: NoteDocument;
+
+      if (file.name.endsWith('.json')) {
+        const parsed = JSON.parse(text);
+        if (parsed.title && Array.isArray(parsed.blocks)) {
+          importedDoc = {
+            ...parsed,
+            id: 'doc-' + Date.now(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+        } else if (parsed.documents && Array.isArray(parsed.documents)) {
+          // Workspace backup import
+          setDocuments((prev) => [...parsed.documents, ...prev]);
+          if (parsed.documents.length > 0) setActiveDocId(parsed.documents[0].id);
+          return;
+        } else {
+          throw new Error('Invalid JSON note format');
+        }
+      } else {
+        // Parse Markdown text
+        const titleFromFileName = file.name.replace(/\.(md|txt)$/i, '');
+        const blocks = parseMarkdownToBlocks(text);
+        importedDoc = {
+          id: 'doc-' + Date.now(),
+          title: titleFromFileName || 'Imported Note',
+          icon: '📄',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          blocks,
+        };
+      }
+
+      setDocuments((prev) => [importedDoc, ...prev]);
+      setActiveDocId(importedDoc.id);
+
+      fetch('/api/documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(importedDoc),
+      });
+    } catch (err) {
+      console.error('Import failed:', err);
+      alert('Could not parse file. Please upload a valid .md or .json note file.');
+    }
+  };
+
   // Export Notes Backup
   const handleExportNotes = () => {
     const exportData = {
@@ -391,6 +506,24 @@ export default function App() {
 
   const activeDoc = documents.find((d) => d.id === activeDocId && !d.isTrashed) || null;
   const activeFolder = activeDoc?.folderId ? folders.find((f) => f.id === activeDoc.folderId) || null : null;
+
+  // Export PDF
+  const handleExportPdf = () => {
+    if (activeDoc) exportDocumentToPdf(activeDoc);
+  };
+
+  // Export Markdown
+  const handleExportMarkdown = () => {
+    if (!activeDoc) return;
+    const md = exportDocumentToMarkdown(activeDoc);
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(activeDoc.title || 'Note').replace(/[^a-z0-9_-]/gi, '_').toLowerCase()}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // Render PIN modal if locked or setup needed
   if (isPinSetup === null) {
@@ -442,11 +575,19 @@ export default function App() {
           document={activeDoc}
           folder={activeFolder}
           saveStatus={saveStatus}
+          driveConnected={driveConnected}
+          theme={metadata.theme}
+          onToggleTheme={handleToggleTheme}
           isFavorite={activeDoc ? favorites.includes(activeDoc.id) || Boolean(activeDoc.isFavorite) : false}
           onToggleFavorite={() => activeDoc && handleToggleFavorite(activeDoc.id)}
           onDeleteDocument={() => activeDoc && handleDeleteDocumentRequest(activeDoc.id)}
           onLock={handleLockWorkspace}
           onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
+          onOpenShare={() => setIsShareModalOpen(true)}
+          onExportPdf={handleExportPdf}
+          onExportMarkdown={handleExportMarkdown}
+          onExportJson={handleExportNotes}
+          onImportDocument={handleImportDocument}
         />
 
         {activeDoc ? (
@@ -478,6 +619,14 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* Command & Dialog Modals */}
+      <ShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        document={activeDoc}
+        onToggleShare={handleToggleShare}
+      />
 
       {/* Command & Dialog Modals */}
       <SearchModal

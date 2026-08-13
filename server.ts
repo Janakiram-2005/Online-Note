@@ -355,6 +355,64 @@ app.delete('/api/documents/:id/permanent', requireAuth, (req, res) => {
   }
 });
 
+// 5b. Toggle Public Sharing
+app.post('/api/documents/:id/share', requireAuth, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isShared } = req.body;
+    const storage = loadLocalStorage();
+    const doc = storage.documents[id];
+
+    if (!doc) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    if (!doc.shareToken) {
+      doc.shareToken = crypto.randomBytes(16).toString('hex');
+    }
+
+    doc.isPublicShared = Boolean(isShared);
+    storage.documents[id] = doc;
+    saveLocalStorage(storage);
+
+    res.json({
+      success: true,
+      shareToken: doc.shareToken,
+      isPublicShared: doc.isPublicShared,
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to update document share status.' });
+  }
+});
+
+// 5c. Public Read-Only View Endpoint (NO Auth required)
+app.get('/api/share/:shareToken', (req, res) => {
+  try {
+    const { shareToken } = req.params;
+    const storage = loadLocalStorage();
+
+    const doc = Object.values(storage.documents).find(
+      (d) => d.shareToken === shareToken && d.isPublicShared && !d.isTrashed
+    );
+
+    if (!doc) {
+      return res.status(404).json({ error: 'Shared document not found or link has expired.' });
+    }
+
+    res.json({
+      document: {
+        id: doc.id,
+        title: doc.title,
+        icon: doc.icon,
+        updatedAt: doc.updatedAt,
+        blocks: doc.blocks,
+      },
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Error fetching shared document.' });
+  }
+});
+
 // 6. Folders CRUD
 app.post('/api/folders', requireAuth, (req, res) => {
   try {

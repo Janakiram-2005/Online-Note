@@ -8,7 +8,10 @@ export type BlockType =
   | 'todo'
   | 'quote'
   | 'code'
-  | 'divider';
+  | 'divider'
+  | 'image'
+  | 'table'
+  | 'callout';
 
 export interface NoteBlock {
   id: string;
@@ -16,6 +19,10 @@ export interface NoteBlock {
   content: string;
   checked?: boolean;
   language?: string;
+  imageUrl?: string;
+  caption?: string;
+  calloutIcon?: string;
+  tableData?: string[][]; // 2D array of table cells
 }
 
 export interface NoteDocument {
@@ -29,6 +36,8 @@ export interface NoteDocument {
   updatedAt: string;
   isFavorite?: boolean;
   isTrashed?: boolean;
+  shareToken?: string;
+  isPublicShared?: boolean;
   blocks: NoteBlock[];
 }
 
