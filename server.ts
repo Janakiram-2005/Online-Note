@@ -3,11 +3,7 @@ import cookieParser from 'cookie-parser';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = 3000;
@@ -16,7 +12,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 
 // Local persistent data directory
-const DATA_DIR = path.join(__dirname, '.data');
+const DATA_DIR = path.join(process.cwd(), '.data');
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
