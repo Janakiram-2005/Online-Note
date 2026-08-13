@@ -1,0 +1,6 @@
+{
+  "name": "MyNotes",
+  "description": "Personal Notion-like notes & document workspace powered by Google Drive storage.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
