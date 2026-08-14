@@ -561,7 +561,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F9F8F6] dark:bg-[#1A1918] text-[#2A2826] dark:text-[#F9F8F6] flex flex-col md:flex-row antialiased selection:bg-[#E8E4DF] dark:selection:bg-[#2C2A28]">
+    <div className="h-screen overflow-hidden bg-[#F9F8F6] dark:bg-[#1A1918] text-[#2A2826] dark:text-[#F9F8F6] flex flex-col md:flex-row antialiased selection:bg-[#E8E4DF] dark:selection:bg-[#2C2A28]">
       {/* Workspace Sidebar */}
       <Sidebar
         documents={documents}
@@ -569,6 +569,7 @@ export default function App() {
         activeDocId={activeDocId}
         onSelectDoc={(id) => setActiveDocId(id)}
         onCreateDoc={handleCreateDocument}
+        onDeleteDoc={handleDeleteDocumentRequest}
         onCreateFolder={() => setIsFolderModalOpen(true)}
         onOpenSearch={() => setIsSearchOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
@@ -579,7 +580,7 @@ export default function App() {
       />
 
       {/* Workspace Main Area */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto min-h-screen">
+      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto h-full relative">
         <Header
           document={activeDoc}
           folder={activeFolder}

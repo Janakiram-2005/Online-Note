@@ -93,6 +93,18 @@ export const Editor: React.FC<EditorProps> = ({
     }
   }, [blocks, onBlocksChange]);
 
+  // Auto-resize textareas to fit content
+  useEffect(() => {
+    Object.values(blockRefs.current).forEach((el) => {
+      const element = el as HTMLTextAreaElement | HTMLInputElement | null;
+      if (element && element.tagName.toLowerCase() === 'textarea') {
+        const textarea = element as HTMLTextAreaElement;
+        textarea.style.height = 'auto';
+        textarea.style.height = textarea.scrollHeight + 'px';
+      }
+    });
+  }, [blocks]);
+
   const updateBlock = useCallback(
     (id: string, newFields: Partial<NoteBlock>) => {
       const newBlocks = blocks.map((b) => (b.id === id ? { ...b, ...newFields } : b));
