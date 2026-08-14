@@ -53,6 +53,7 @@ export default function App() {
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(true);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -71,9 +72,14 @@ export default function App() {
       const res = await fetch('/api/auth/pin-status');
       const data = await res.json();
       setIsPinSetup(data.isSetup);
-      if (data.isSetup) {
-        // Always require PIN re-authentication on new page open / reload
+      
+      const sessionActive = sessionStorage.getItem('mynotes_session_active') === 'true';
+      
+      if (data.isSetup && !sessionActive) {
         setIsUnlocked(false);
+        fetch('/api/auth/lock', { method: 'POST' }).catch(() => {});
+      } else if (data.isSetup && sessionActive) {
+        setIsUnlocked(data.isUnlocked);
       } else {
         setIsUnlocked(true);
       }
@@ -103,6 +109,7 @@ export default function App() {
       const elapsed = Date.now() - lastActivityRef.current;
       if (elapsed >= 5 * 60 * 1000) {
         // 5 minutes of inactivity passed -> lock workspace
+        sessionStorage.removeItem('mynotes_session_active');
         fetch('/api/auth/lock', { method: 'POST' }).catch(() => {});
         setIsUnlocked(false);
         setIsSettingsOpen(false);
@@ -263,6 +270,7 @@ export default function App() {
   // Lock Workspace
   const handleLockWorkspace = async () => {
     try {
+      sessionStorage.removeItem('mynotes_session_active');
       await fetch('/api/auth/lock', { method: 'POST' });
       setIsUnlocked(false);
       setIsMobileMenuOpen(false);
@@ -315,6 +323,26 @@ export default function App() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newFolder),
     });
+  };
+
+  const handleRenameFolder = (id: string, newName: string) => {
+    setFolders((prev) => prev.map((f) => (f.id === id ? { ...f, name: newName } : f)));
+    const updated = folders.find((f) => f.id === id);
+    if (updated) {
+      fetch('/api/folders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...updated, name: newName }),
+      });
+    }
+  };
+
+  const handleDeleteFolder = (id: string) => {
+    setFolders((prev) => prev.filter((f) => f.id !== id));
+    setDocuments((prev) =>
+      prev.map((d) => (d.folderId === id ? { ...d, folderId: null } : d))
+    );
+    fetch(`/api/folders/${id}`, { method: 'DELETE' });
   };
 
   // Save Document with Debounce
@@ -571,12 +599,16 @@ export default function App() {
         onCreateDoc={handleCreateDocument}
         onDeleteDoc={handleDeleteDocumentRequest}
         onCreateFolder={() => setIsFolderModalOpen(true)}
+        onRenameFolder={handleRenameFolder}
+        onDeleteFolder={handleDeleteFolder}
         onOpenSearch={() => setIsSearchOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onLock={handleLockWorkspace}
         favorites={favorites}
         isOpenMobile={isMobileMenuOpen}
         onCloseMobile={() => setIsMobileMenuOpen(false)}
+        isDesktopSidebarOpen={isDesktopSidebarOpen}
+        onToggleDesktopSidebar={() => setIsDesktopSidebarOpen(!isDesktopSidebarOpen)}
       />
 
       {/* Workspace Main Area */}
@@ -592,6 +624,8 @@ export default function App() {
           onDeleteDocument={() => activeDoc && handleDeleteDocumentRequest(activeDoc.id)}
           onLock={handleLockWorkspace}
           onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
+          isDesktopSidebarOpen={isDesktopSidebarOpen}
+          onToggleDesktopSidebar={() => setIsDesktopSidebarOpen(!isDesktopSidebarOpen)}
           onOpenShare={() => setIsShareModalOpen(true)}
           onExportPdf={handleExportPdf}
           onExportMarkdown={handleExportMarkdown}

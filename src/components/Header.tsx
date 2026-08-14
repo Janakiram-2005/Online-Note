@@ -14,6 +14,7 @@ import {
   Moon,
   Sun,
   ChevronDown,
+  Sidebar as SidebarIcon,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -27,6 +28,8 @@ interface HeaderProps {
   onDeleteDocument: () => void;
   onLock: () => void;
   onOpenMobileMenu: () => void;
+  onToggleDesktopSidebar?: () => void;
+  isDesktopSidebarOpen?: boolean;
   onOpenShare: () => void;
   onExportPdf: () => void;
   onExportMarkdown: () => void;
@@ -45,6 +48,8 @@ export const Header: React.FC<HeaderProps> = ({
   onDeleteDocument,
   onLock,
   onOpenMobileMenu,
+  onToggleDesktopSidebar,
+  isDesktopSidebarOpen = true,
   onOpenShare,
   onExportPdf,
   onExportMarkdown,
@@ -62,6 +67,14 @@ export const Header: React.FC<HeaderProps> = ({
           className="p-1.5 md:hidden text-[#8C8881] hover:bg-[#F3F1EE] dark:hover:bg-[#2C2A28] rounded-lg cursor-pointer"
         >
           <Menu className="w-5 h-5" />
+        </button>
+
+        <button
+          onClick={onToggleDesktopSidebar}
+          className="p-1.5 hidden md:block text-[#8C8881] hover:bg-[#F3F1EE] dark:hover:bg-[#2C2A28] rounded-lg cursor-pointer"
+          title="Toggle Sidebar"
+        >
+          <SidebarIcon className="w-5 h-5" />
         </button>
 
         {/* M Logo Badge */}

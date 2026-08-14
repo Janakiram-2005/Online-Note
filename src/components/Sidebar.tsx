@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { NoteDocument, NoteFolder } from '../types';
+import { exportFolderToZip } from '../utils/zip';
 import {
   FileText,
   Folder,
@@ -19,6 +20,10 @@ import {
   Menu,
   X,
   HardDrive,
+  MoreVertical,
+  Download,
+  Edit2,
+  Info,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -29,12 +34,16 @@ interface SidebarProps {
   onCreateDoc: (folderId?: string | null) => void;
   onDeleteDoc?: (id: string) => void;
   onCreateFolder: () => void;
+  onRenameFolder?: (id: string, newName: string) => void;
+  onDeleteFolder?: (id: string) => void;
   onOpenSearch: () => void;
   onOpenSettings: () => void;
   onLock: () => void;
   favorites: string[];
   isOpenMobile: boolean;
   onCloseMobile: () => void;
+  isDesktopSidebarOpen?: boolean;
+  onToggleDesktopSidebar?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -45,14 +54,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCreateDoc,
   onDeleteDoc,
   onCreateFolder,
+  onRenameFolder,
+  onDeleteFolder,
   onOpenSearch,
   onOpenSettings,
   onLock,
   favorites,
   isOpenMobile,
   onCloseMobile,
+  isDesktopSidebarOpen = true,
+  onToggleDesktopSidebar,
 }) => {
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
+  const [activeFolderMenu, setActiveFolderMenu] = useState<string | null>(null);
 
   const toggleFolder = (folderId: string) => {
     setExpandedFolders((prev) => ({ ...prev, [folderId]: !prev[folderId] }));
@@ -62,6 +76,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const favoriteDocs = activeDocs.filter((d) => favorites.includes(d.id) || d.isFavorite);
   const recentDocs = [...activeDocs].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).slice(0, 5);
   const rootDocs = activeDocs.filter((d) => !d.folderId);
+
+  const handleFolderAction = (e: React.MouseEvent, folder: NoteFolder, action: string) => {
+    e.stopPropagation();
+    setActiveFolderMenu(null);
+    if (action === 'zip') {
+      exportFolderToZip(folder, documents);
+    } else if (action === 'rename' && onRenameFolder) {
+      const newName = prompt('Enter new folder name:', folder.name);
+      if (newName && newName.trim()) {
+        onRenameFolder(folder.id, newName.trim());
+      }
+    } else if (action === 'delete' && onDeleteFolder) {
+      if (confirm(`Are you sure you want to delete the folder "${folder.name}"? Documents inside will be moved to root.`)) {
+        onDeleteFolder(folder.id);
+      }
+    } else if (action === 'properties') {
+      const folderDocs = documents.filter((d) => d.folderId === folder.id && !d.isTrashed);
+      const createdAt = new Date(folder.createdAt).toLocaleString();
+      alert(`Folder Properties:\n\nName: ${folder.name}\nDocuments: ${folderDocs.length}\nCreated: ${createdAt}`);
+    }
+  };
 
   return (
     <>
@@ -74,8 +109,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       <aside
-        className={`fixed md:static inset-y-0 left-0 z-50 w-64 bg-[#F3F1EE] dark:bg-[#1A1918] border-r border-[#E8E4DF] dark:border-[#2C2A28] flex flex-col justify-between transition-transform duration-200 ${
-          isOpenMobile ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        className={`fixed md:static inset-y-0 left-0 z-50 bg-[#F3F1EE] dark:bg-[#1A1918] border-r border-[#E8E4DF] dark:border-[#2C2A28] flex flex-col justify-between transition-all duration-300 ${
+          isOpenMobile ? 'translate-x-0 w-64' : (isDesktopSidebarOpen ? 'w-64 -translate-x-full md:translate-x-0' : 'w-0 -translate-x-full overflow-hidden opacity-0 border-r-0')
         }`}
       >
         {/* Top Header */}
@@ -177,7 +212,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   return (
                     <div key={folder.id}>
                       <div
-                        className="w-full px-2 py-1.5 flex items-center justify-between text-sm text-[#4A4744] dark:text-[#D1CDC7] hover:bg-[#E8E4DF] dark:hover:bg-[#2C2A28] rounded-md transition group cursor-pointer"
+                        className="w-full px-2 py-1.5 flex items-center justify-between text-sm text-[#4A4744] dark:text-[#D1CDC7] hover:bg-[#E8E4DF] dark:hover:bg-[#2C2A28] rounded-md transition group cursor-pointer relative"
                       >
                         <div
                           onClick={() => toggleFolder(folder.id)}
@@ -187,20 +222,62 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           <span className="truncate">{folder.name}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <span className="text-[10px] bg-[#DED9D2] dark:bg-[#383432] px-1.5 rounded text-[#706C64] dark:text-[#A39F98] font-mono">
+                          <span className="text-[10px] bg-[#DED9D2] dark:bg-[#383432] px-1.5 rounded text-[#706C64] dark:text-[#A39F98] font-mono group-hover:hidden">
                             {folderDocs.length}
                           </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onCreateDoc(folder.id);
-                            }}
-                            className="p-1 opacity-0 group-hover:opacity-100 hover:bg-[#DED9D2] dark:hover:bg-[#383432] rounded transition"
-                            title="Add doc to folder"
-                          >
-                            <Plus className="w-3 h-3 text-[#5A5A40]" />
-                          </button>
+                          
+                          <div className="hidden group-hover:flex items-center gap-0.5">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onCreateDoc(folder.id);
+                              }}
+                              className="p-1 hover:bg-[#DED9D2] dark:hover:bg-[#383432] rounded transition"
+                              title="Add doc to folder"
+                            >
+                              <Plus className="w-3 h-3 text-[#5A5A40]" />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveFolderMenu(activeFolderMenu === folder.id ? null : folder.id);
+                              }}
+                              className="p-1 hover:bg-[#DED9D2] dark:hover:bg-[#383432] rounded transition"
+                            >
+                              <MoreVertical className="w-3 h-3 text-[#5A5A40]" />
+                            </button>
+                          </div>
                         </div>
+
+                        {activeFolderMenu === folder.id && (
+                          <div className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-[#1C1A19] border border-[#E8E4DF] dark:border-[#2C2A28] rounded-xl shadow-lg z-50 py-1 text-xs">
+                            <button
+                              onClick={(e) => handleFolderAction(e, folder, 'zip')}
+                              className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-[#F3F1EE] dark:hover:bg-[#2C2A28] text-[#4A4744] dark:text-[#D1CDC7]"
+                            >
+                              <Download className="w-3.5 h-3.5" /> Download Zip
+                            </button>
+                            <button
+                              onClick={(e) => handleFolderAction(e, folder, 'rename')}
+                              className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-[#F3F1EE] dark:hover:bg-[#2C2A28] text-[#4A4744] dark:text-[#D1CDC7]"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" /> Rename
+                            </button>
+                            <button
+                              onClick={(e) => handleFolderAction(e, folder, 'properties')}
+                              className="w-full px-3 py-1.5 text-left flex items-center gap-2 hover:bg-[#F3F1EE] dark:hover:bg-[#2C2A28] text-[#4A4744] dark:text-[#D1CDC7]"
+                            >
+                              <Info className="w-3.5 h-3.5" /> Properties
+                            </button>
+                            <div className="my-1 border-t border-[#F3F1EE] dark:border-[#2C2A28]" />
+                            <button
+                              onClick={(e) => handleFolderAction(e, folder, 'delete')}
+                              className="w-full px-3 py-1.5 text-left flex items-center gap-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" /> Delete
+                            </button>
+                          </div>
+                        )}
                       </div>
 
                       {/* Folder Child Docs */}

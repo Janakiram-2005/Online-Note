@@ -29,6 +29,8 @@ import {
   Check,
   PlusCircle,
   Trash,
+  Palette,
+  ClipboardPaste,
 } from 'lucide-react';
 
 interface EditorProps {
@@ -77,6 +79,8 @@ export const Editor: React.FC<EditorProps> = ({
   const [activeHoverBlock, setActiveHoverBlock] = useState<string | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [blockMenuOpen, setBlockMenuOpen] = useState<string | null>(null);
+  
+  const [selection, setSelection] = useState<{ blockId: string, start: number, end: number, text: string } | null>(null);
 
   const blockRefs = useRef<{ [id: string]: HTMLTextAreaElement | HTMLInputElement | null }>({});
 
@@ -104,6 +108,60 @@ export const Editor: React.FC<EditorProps> = ({
       }
     });
   }, [blocks]);
+
+  const handleSelect = (e: React.SyntheticEvent<HTMLTextAreaElement | HTMLInputElement>, block: NoteBlock) => {
+    const target = e.currentTarget as HTMLTextAreaElement;
+    if (target.selectionStart !== target.selectionEnd) {
+      setSelection({
+        blockId: block.id,
+        start: target.selectionStart,
+        end: target.selectionEnd,
+        text: target.value.substring(target.selectionStart, target.selectionEnd),
+      });
+    } else {
+      setSelection(null);
+    }
+  };
+
+  const applyFormat = (formatStr: string) => {
+    if (!selection) return;
+    const block = blocks.find((b) => b.id === selection.blockId);
+    if (!block) return;
+    
+    // For bold/italic: **text**, *text*
+    // If wrapping, we wrap the text.
+    const before = block.content.substring(0, selection.start);
+    const selected = block.content.substring(selection.start, selection.end);
+    const after = block.content.substring(selection.end);
+    
+    const newContent = `${before}${formatStr}${selected}${formatStr}${after}`;
+    updateBlock(block.id, { content: newContent });
+    setSelection(null);
+  };
+
+  const handleCopy = () => {
+    if (selection) {
+      navigator.clipboard.writeText(selection.text);
+      setSelection(null);
+    }
+  };
+
+  const handlePaste = async () => {
+    if (selection) {
+      try {
+        const text = await navigator.clipboard.readText();
+        const block = blocks.find((b) => b.id === selection.blockId);
+        if (block) {
+          const before = block.content.substring(0, selection.start);
+          const after = block.content.substring(selection.end);
+          updateBlock(block.id, { content: `${before}${text}${after}` });
+        }
+      } catch (e) {
+        console.error('Failed to read clipboard');
+      }
+      setSelection(null);
+    }
+  };
 
   const updateBlock = useCallback(
     (id: string, newFields: Partial<NoteBlock>) => {
@@ -408,7 +466,7 @@ export const Editor: React.FC<EditorProps> = ({
       </div>
 
       {/* Blocks Container */}
-      <div className="space-y-3 min-h-[500px]">
+      <div className="space-y-3 min-h-[500px] pb-[50vh]">
         {blocks.map((block, index) => {
           const isHovered = activeHoverBlock === block.id;
 
@@ -535,6 +593,7 @@ export const Editor: React.FC<EditorProps> = ({
                       value={block.content}
                       onChange={(e) => handleInputChange(e, block, index)}
                       onKeyDown={(e) => handleKeyDown(e, block, index)}
+                      onSelect={(e) => handleSelect(e, block)}
                       readOnly={readOnly}
                       placeholder="Callout text or reminder..."
                       className="w-full bg-transparent border-none outline-none resize-none text-base text-[#2A2826] dark:text-[#F9F8F6] leading-relaxed placeholder:text-[#C4C0B9]"
@@ -753,6 +812,7 @@ export const Editor: React.FC<EditorProps> = ({
                     value={block.content}
                     onChange={(e) => handleInputChange(e, block, index)}
                     onKeyDown={(e) => handleKeyDown(e, block, index)}
+                    onSelect={(e) => handleSelect(e, block)}
                     readOnly={readOnly}
                     rows={block.type === 'code' ? Math.max(2, block.content.split('\n').length) : 1}
                     placeholder={
@@ -825,6 +885,55 @@ export const Editor: React.FC<EditorProps> = ({
           );
         })}
       </div>
+
+      {/* Floating Formatting Toolbar */}
+      {selection && !readOnly && (
+        <div className="fixed bottom-10 left-1/2 transform -translate-x-1/2 z-50 bg-[#1C1A19] text-white rounded-full shadow-2xl px-2 py-1.5 flex items-center gap-1 animate-in slide-in-from-bottom-5">
+          <button
+            onMouseDown={(e) => { e.preventDefault(); applyFormat('**'); }}
+            className="p-1.5 hover:bg-[#383432] rounded-full transition"
+            title="Bold"
+          >
+            <Bold className="w-4 h-4" />
+          </button>
+          <button
+            onMouseDown={(e) => { e.preventDefault(); applyFormat('*'); }}
+            className="p-1.5 hover:bg-[#383432] rounded-full transition"
+            title="Italic"
+          >
+            <Italic className="w-4 h-4" />
+          </button>
+          <button
+            onMouseDown={(e) => { e.preventDefault(); applyFormat('~~'); }}
+            className="p-1.5 hover:bg-[#383432] rounded-full transition"
+            title="Strikethrough"
+          >
+            <Strikethrough className="w-4 h-4" />
+          </button>
+          <button
+            onMouseDown={(e) => { e.preventDefault(); applyFormat('`'); }}
+            className="p-1.5 hover:bg-[#383432] rounded-full transition"
+            title="Inline Code"
+          >
+            <Code2 className="w-4 h-4" />
+          </button>
+          <div className="w-px h-4 bg-[#383432] mx-1" />
+          <button
+            onMouseDown={(e) => { e.preventDefault(); handleCopy(); }}
+            className="p-1.5 hover:bg-[#383432] rounded-full transition"
+            title="Copy"
+          >
+            <Copy className="w-4 h-4" />
+          </button>
+          <button
+            onMouseDown={(e) => { e.preventDefault(); handlePaste(); }}
+            className="p-1.5 hover:bg-[#383432] rounded-full transition"
+            title="Paste"
+          >
+            <ClipboardPaste className="w-4 h-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };
